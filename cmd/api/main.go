@@ -1,30 +1,34 @@
 package main
 
 import (
+	"context"
 	"log"
-	"net/http"
 
+	"github.com/neptune2k21/chemin-d-or/internal/app"
 	"github.com/neptune2k21/chemin-d-or/internal/config"
-	"github.com/neptune2k21/chemin-d-or/internal/server"
-	"github.com/neptune2k21/chemin-d-or/internal/storage"
+	"github.com/neptune2k21/chemin-d-or/pkg/logger"
+	"go.uber.org/zap"
 )
 
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
+		log.Fatalf("erreur lors du chargement de la configuration: %v", err)
 	}
 
-	db, err := storage.NewPostgresPool(cfg.DatabaseURL())
+	l, err := logger.New()
 	if err != nil {
-		log.Fatalf("erreur lors de la connexion à la base de données: %v", err)
+		log.Fatalf("erreur lors de l'initialisation du logger: %v", err)
 	}
-	defer db.Close()
+	defer l.Sync() //nolint:errcheck
 
-	router := server.NewRouter()
+	a, err := app.New(cfg, l)
+	if err != nil {
+		l.Fatal("erreur lors de l'initialisation de l'application", zap.Error(err))
+	}
+	defer a.Shutdown(context.Background())
 
-	log.Printf("serveur demarrer sur  :%s", cfg.AppPort)
-	if err := http.ListenAndServe(":"+cfg.AppPort, router); err != nil {
-		log.Fatalf("erreur lors du démarrage du serveur: %v", err)
+	if err := a.Run(); err != nil {
+		l.Fatal("serveur arrêté", zap.Error(err))
 	}
 }

@@ -6,9 +6,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/neptune2k21/chemin-d-or/internal/tasks"
 )
 
-func NewRouter() http.Handler {
+func NewRouter(taskHandler *tasks.Handler) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -21,6 +22,14 @@ func NewRouter() http.Handler {
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status": "ok",
 		})
+	})
+
+	r.Route("/tasks", func(r chi.Router) {
+		r.Post("/", taskHandler.Create)
+		r.Get("/", taskHandler.List)
+		r.Get("/{id}", taskHandler.GetByID)
+		r.Patch("/{id}", taskHandler.Update)
+		r.Delete("/{id}", taskHandler.Delete)
 	})
 
 	return r

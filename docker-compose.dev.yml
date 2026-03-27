@@ -1,4 +1,23 @@
 services:
+  migrate:
+    image: postgres:17-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./internal/storage/migrations:/migrations:ro
+    environment:
+      PGPASSWORD: ${DB_PASSWORD:-postgres}
+    command: >
+      sh -c "
+        for f in $$(ls /migrations/*.sql | sort); do
+          echo \"Applying migration: $$f\";
+          awk '/-- migrate:up/{f=1;next}/-- migrate:down/{f=0}f' \"$$f\" |
+          psql -h postgres -U $${DB_USER:-postgres} -d \"$${DB_NAME:-chemin-d-or}\";
+        done
+      "
+    restart: on-failure
+
   api:
     build:
       context: .
@@ -8,6 +27,9 @@ services:
     volumes:
       - .:/app
       - go_modules:/go/pkg/mod
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   go_modules:
